@@ -42,7 +42,9 @@ python3 -m http.server 4173 --bind 127.0.0.1
 
 ## 第一次发布到 GitHub Pages
 
-当前项目尚未绑定远程 GitHub 仓库。
+项目仓库：[XiyangLiu666/personal-journal](https://github.com/XiyangLiu666/personal-journal)。
+
+网站地址：[未完](https://xiyangliu666.github.io/personal-journal/)。以下为首次部署或迁移到其他仓库时的步骤。
 
 1. 登录 GitHub，新建仓库，例如 `personal-journal`。普通 GitHub Free 账号可选公开仓库使用 Pages。
 2. 把项目全部文件提交到仓库的 `main` 分支，包含隐藏目录 `.github/workflows/pages.yml`。
@@ -55,7 +57,7 @@ python3 -m http.server 4173 --bind 127.0.0.1
 ```sh
 git add .
 git commit -m "Create personal journal website"
-git remote add origin https://github.com/YOUR_USERNAME/personal-journal.git
+git remote add origin https://github.com/XiyangLiu666/personal-journal.git
 git push -u origin main
 ```
 
