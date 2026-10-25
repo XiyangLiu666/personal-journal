@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="一个收集日常、照片与记忆的私人角落。">
+  <meta name="theme-color" content="#201c1a">
+  <title>未完 · a personal journal</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body class="is-home">
+  <a class="skip" href="#main">跳到内容</a>
+  <header class="masthead">
+    <a class="wordmark" href="#home" id="wordmark">未完</a>
+    <span class="since" id="since">a personal journal · since 2026</span>
+    <a class="letter-link" href="#letter">to me <span>↗</span></a>
+  </header>
+  <div id="draft-banner" hidden>正在预览此浏览器中的草稿 · 尚未发布 <a href="editor.html">返回编辑</a></div>
+  <main id="main" tabindex="-1" aria-live="polite"><p class="loading">正在打开这一页……</p></main>
+  <footer class="bottom-bar">
+    <div class="footer-tools"><a href="editor.html">edit</a><span>/</span><span id="footer-year">2026</span></div>
+    <nav aria-label="主导航">
+      <a href="#life" data-page="life">life</a>
+      <a href="#leaf" data-page="leaf">leaf</a>
+      <a href="#about" data-page="about">about</a>
+      <a href="#timeline" data-page="timeline">days</a>
+      <a href="#favorites" data-page="favorites">collection</a>
+      <a href="#home" data-page="home">home</a>
+    </nav>
+  </footer>
+  <dialog id="photo-dialog"><button class="photo-close" aria-label="关闭照片">×</button><img alt=""><p></p></dialog>
+</body>
+</html>

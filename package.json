@@ -1,0 +1,11 @@
+{
+  "name": "meantime-personal-journal",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "python3 -m http.server 4173 --bind 127.0.0.1",
+    "check": "node scripts/check.mjs",
+    "test": "node --test tests/content.test.mjs"
+  }
+}
