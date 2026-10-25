@@ -31,10 +31,10 @@ python3 -m http.server 4173 --bind 127.0.0.1
 | 页面 | 内容 | 数据位置 |
 | --- | --- | --- |
 | home | 全屏封面、首页文字 | `site` |
-| life | 日记、搜索、文章全文 | `posts` |
-| leaf | 照片、日期、说明、放大 | `photos` |
+| life | 彩色背景、半透明窄栏、照片与文字流 | `posts` |
+| leaf | 树叶背景、半透明窄栏、纵向照片流 | `photos` |
 | about | 名字、自我介绍、近况 | `site` |
-| days | 按日期排列的时间线 | `timeline` |
+| days | event 形式的白色内容面板、分页记录 | `timeline` |
 | collection | 书、音乐、地点及链接 | `favorites` |
 | to me | 写给自己的信、可选邮箱 | `site` |
 
@@ -88,3 +88,11 @@ node --test tests/content.test.mjs
 ## 封面来源
 
 `assets/hero.jpg` 使用内置 imagegen 生成，为可替换的示例，并非你本人的照片。生成提示词记录于 [assets/IMAGE_PROMPT.md](assets/IMAGE_PROMPT.md)。
+
+## 子页样式与图片设置
+
+life 和 leaf 采用参考站的整屏背景、靠左窄栏和半透明黑底；about 与 collection 使用白色主面板和右侧 bio 分类栏；days 使用 event 内容面板和上一页 / 下一页。首页布局保持原样。
+
+在编辑器“网站设置”末尾可以更换 life、leaf、个人介绍 / 收藏、时间线的背景图片。日记可添加照片路径，收藏可添加封面，时间线可添加配图；这些字段均可留空，旧版内容文件仍然兼容。
+
+此次调整已将此前上传到根目录 content.json 中的个人设置合并到正式使用的 data/content.json。以后更新请替换 data 文件夹里的内容文件。

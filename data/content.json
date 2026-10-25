@@ -1,6 +1,6 @@
 {
   "site": {
-    "title": "未完",
+    "title": "不在他方",
     "subtitle": "a personal journal",
     "owner": "你的名字",
     "since": "2026",
@@ -12,23 +12,128 @@
     "about": "这是我的一小片地方。\n\n不急着抵达什么，只想认真地看看身边的事物，把平凡的日子收好。\n\n这里的文字目前是示例。你可以在编辑页替换成自己的介绍、经历和近况。",
     "location": "此时，此地",
     "email": "",
-    "letter": "亲爱的自己：\n\n愿你一直保留好奇，也记得给自己留一点空白。\n\n这是一封示例信。以后，在这里写下你想对自己说的话。"
+    "letter": "亲爱的自己：\n\n愿你一直保留好奇，也记得给自己留一点空白。\n\n这是一封示例信。以后，在这里写下你想对自己说的话。",
+    "lifeBackground": "assets/life-background.jpg",
+    "leafBackground": "assets/leaf-background.jpg",
+    "bioBackground": "assets/bio-background.jpg",
+    "eventBackground": "assets/event-background.jpg"
   },
   "posts": [
-    {"id":"first-page","date":"2026-10-24","title":"从这一页开始","tag":"日常","body":"示例文字 · 可在编辑页修改或删除。\n\n想给生活找一个安静的地方。没有太多声音，也不用急着回应。\n\n于是，打开这一页。以后就把看见的、想到的，都慢慢留在这里。"},
-    {"id":"a-little-blank","date":"2026-10-20","title":"留一点空白","tag":"随想","body":"示例文字 · 可在编辑页修改或删除。\n\n有时候，一天最好的部分，是没有安排的那一小段时间。\n\n让风吹一会儿，让思绪走远一点。"},
-    {"id":"ordinary-things","date":"2026-10-12","title":"一些小事","tag":"日常","body":"示例文字 · 可在编辑页修改或删除。\n\n记下一束光，一段散步的路，一句话。\n\n那些看起来微不足道的片刻，也组成了生活。"}
+    {
+      "id": "first-page",
+      "date": "2026-10-24",
+      "title": "从这一页开始",
+      "tag": "日常",
+      "body": "示例文字 · 可在编辑页修改或删除。\n\n想给生活找一个安静的地方。没有太多声音，也不用急着回应。\n\n于是，打开这一页。以后就把看见的、想到的，都慢慢留在这里。",
+      "image": "assets/life-still.jpg"
+    },
+    {
+      "id": "a-little-blank",
+      "date": "2026-10-20",
+      "title": "留一点空白",
+      "tag": "随想",
+      "body": "示例文字 · 可在编辑页修改或删除。\n\n有时候，一天最好的部分，是没有安排的那一小段时间。\n\n让风吹一会儿，让思绪走远一点。",
+      "image": "assets/leaf-background.jpg"
+    },
+    {
+      "id": "ordinary-things",
+      "date": "2026-10-12",
+      "title": "一些小事",
+      "tag": "日常",
+      "body": "示例文字 · 可在编辑页修改或删除。\n\n记下一束光，一段散步的路，一句话。\n\n那些看起来微不足道的片刻，也组成了生活。",
+      "image": "assets/hero.jpg"
+    }
   ],
   "photos": [
-    {"id":"quiet-water","date":"2026-10-24","title":"水边，片刻","src":"assets/hero.jpg","alt":"黑白湖边照片，人物背影与远山。","caption":"AI 生成示例照片 · 换成你的照片，故事就从这里开始。"}
+    {
+      "id": "quiet-water",
+      "date": "2026-10-24",
+      "title": "水边，片刻",
+      "src": "assets/hero.jpg",
+      "alt": "黑白湖边照片，人物背影与远山。",
+      "caption": "AI 生成示例照片 · 换成你的照片，故事就从这里开始。"
+    },
+    {
+      "id": "sample-clouds",
+      "date": "2026-10-25",
+      "title": "云的另一边",
+      "src": "assets/leaf-clouds.jpg",
+      "alt": "淡蓝色天空下连绵的白色云层。AI 生成示例照片。",
+      "caption": "示例照片 · 经过云层的时候，把这一点安静留了下来。"
+    },
+    {
+      "id": "sample-leaves",
+      "date": "2026-10-23",
+      "title": "树叶之间",
+      "src": "assets/leaf-background.jpg",
+      "alt": "阳光穿过绿色树叶和斜伸的枝条。AI 生成示例照片。",
+      "caption": "示例照片 · 抬头看见的一小片光。"
+    }
   ],
   "timeline": [
-    {"id":"begin","date":"2026-10-24","title":"一个新的开始","body":"示例记录：建立自己的小网站。"},
-    {"id":"save-moments","date":"2026-10-01","title":"收集日常","body":"示例记录：开始整理那些值得留下的照片与文字。"}
+    {
+      "id": "begin",
+      "date": "2026-10-24",
+      "title": "一个新的开始",
+      "body": "示例记录：建立自己的小网站。",
+      "image": "assets/life-still.jpg"
+    },
+    {
+      "id": "save-moments",
+      "date": "2026-10-01",
+      "title": "收集日常",
+      "body": "示例记录：开始整理那些值得留下的照片与文字。",
+      "image": "assets/life-still.jpg"
+    }
   ],
   "favorites": [
-    {"id":"book","category":"阅读","title":"最近在读的一本书","note":"示例收藏 · 在这里写下书名，以及让你停下来的那一句话。","url":""},
-    {"id":"music","category":"音乐","title":"循环播放的一首歌","note":"示例收藏 · 为一段旋律，留下一点位置。","url":""},
-    {"id":"place","category":"地方","title":"想再去一次的地方","note":"示例收藏 · 记下一个地点，或一个还没有出发的计划。","url":""}
+    {
+      "id": "book",
+      "category": "阅读",
+      "title": "最近在读的一本书",
+      "note": "示例收藏 · 在这里写下书名，以及让你停下来的那一句话。",
+      "url": "",
+      "image": "assets/life-still.jpg"
+    },
+    {
+      "id": "music",
+      "category": "音乐",
+      "title": "循环播放的一首歌",
+      "note": "示例收藏 · 为一段旋律，留下一点位置。",
+      "url": "",
+      "image": "assets/leaf-clouds.jpg"
+    },
+    {
+      "id": "place",
+      "category": "地方",
+      "title": "想再去一次的地方",
+      "note": "示例收藏 · 记下一个地点，或一个还没有出发的计划。",
+      "url": "",
+      "image": "assets/hero.jpg"
+    },
+    {
+      "id": "sample-reading",
+      "category": "阅读",
+      "title": "散步时的笔记",
+      "note": "示例收藏 · 翻到某一页，想起一个很平常的下午。",
+      "url": "",
+      "image": "assets/leaf-background.jpg"
+    },
+    {
+      "id": "sample-record",
+      "category": "音乐",
+      "title": "黄昏里的旋律",
+      "note": "示例收藏 · 留给一段喜欢的声音，也留给一段安静的时间。",
+      "url": "",
+      "image": "assets/life-background.jpg"
+    },
+    {
+      "id": "sample-journey",
+      "category": "地方",
+      "title": "下一次出发",
+      "note": "示例收藏 · 一条想走的路，一个还没抵达的地方。",
+      "url": "",
+      "image": "assets/leaf-clouds.jpg"
+    }
   ]
 }

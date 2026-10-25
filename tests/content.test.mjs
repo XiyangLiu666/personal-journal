@@ -5,9 +5,16 @@ import {validateContent, safeUrl, escapeHTML} from '../js/content.js';
 const example = JSON.parse(await readFile(new URL('../data/content.json',import.meta.url),'utf8'));
 globalThis.location = {href:'https://example.github.io/journal/index.html',origin:'https://example.github.io'};
 test('示例内容与空收藏均可导入',()=>{
-  assert.equal(validateContent(structuredClone(example)).site.title,'未完');
+  assert.equal(validateContent(structuredClone(example)).site.title,example.site.title);
   const empty=structuredClone(example);for(const key of ['posts','photos','timeline','favorites'])empty[key]=[];
   assert.doesNotThrow(()=>validateContent(empty));
+});
+test('旧内容不需要新增图片字段，新增图片路径需为文字',()=>{
+  const legacy=structuredClone(example);
+  for(const key of ['lifeBackground','leafBackground','bioBackground','eventBackground'])delete legacy.site[key];
+  for(const key of ['posts','timeline','favorites'])for(const item of legacy[key])delete item.image;
+  assert.doesNotThrow(()=>validateContent(legacy));
+  legacy.posts[0].image={};assert.throws(()=>validateContent(legacy),/图片路径/);
 });
 test('拒绝不完整文件、重复 ID 与错误日期',()=>{
   assert.throws(()=>validateContent({}));
