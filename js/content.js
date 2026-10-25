@@ -5,6 +5,7 @@ export function validateContent(data) {
   const siteFields = ['title','subtitle','owner','since','heroImage','heroAlt','heroLine','heroNote','intro','about','location','email','letter'];
   for (const key of siteFields) if (typeof data.site[key] !== 'string') throw new Error(`site.${key} 必须是文字。`);
   if (!data.site.title.trim()) throw new Error('请填写网站名称。');
+  for (const key of ['lifeBackground','leafBackground','bioBackground','eventBackground']) if (key in data.site && typeof data.site[key] !== 'string') throw new Error(`${key} 必须是图片路径。`);
   const fields = {posts:['id','date','title','tag','body'],photos:['id','date','title','src','alt','caption'],timeline:['id','date','title','body'],favorites:['id','category','title','note','url']};
   for (const key of collections) {
     if (!Array.isArray(data[key])) throw new Error(`${key} 必须是列表。`);
@@ -13,6 +14,7 @@ export function validateContent(data) {
       if (!item || fields[key].some(field => typeof item[field] !== 'string')) throw new Error(`${key} 中的记录缺少文字字段。`);
       if (!item.id.trim() || ids.has(item.id)) throw new Error(`${key} 中的记录 ID 不能为空或重复。`);
       ids.add(item.id);
+      if ('image' in item && typeof item.image !== 'string') throw new Error('图片路径必须是文字。');
       if (!item.title.trim()) throw new Error(`${key} 中有记录未填写标题。`);
       if ('date' in item) {
         const parsed = new Date(item.date + 'T12:00:00Z');

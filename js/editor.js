@@ -12,11 +12,12 @@ function ask(message) {
 const labels = {posts:'日记',photos:'照片',timeline:'时间线',favorites:'收藏'};
 const fields = {
   site:[['title','网站名称'],['subtitle','英文副标题'],['owner','你的名字'],['since','开始年份'],['heroImage','封面照片路径','wide'],['heroAlt','封面照片描述','wide'],['heroLine','首页的一句话','wide'],['heroNote','首页英文小字','wide'],['location','所在地 / 当前状态'],['email','邮箱（可留空）'],['intro','简短介绍','textarea'],['about','关于我','textarea'],['letter','写给自己的信','textarea']],
-  posts:[['title','标题','wide'],['date','日期','date'],['tag','分类'],['body','正文','textarea']],
+  posts:[['title','标题','wide'],['date','日期','date'],['tag','分类'],['image','照片路径（可留空）','wide'],['body','正文','textarea']],
   photos:[['title','照片标题','wide'],['date','日期','date'],['src','照片路径'],['alt','照片描述（供屏幕阅读器使用）','wide'],['caption','照片说明','textarea']],
-  timeline:[['title','标题','wide'],['date','日期','date'],['body','记录','textarea']],
-  favorites:[['title','标题','wide'],['category','分类'],['url','链接（可留空）'],['note','收藏笔记','textarea']]
+  timeline:[['title','标题','wide'],['date','日期','date'],['image','配图路径（可留空）','wide'],['body','记录','textarea']],
+  favorites:[['title','标题','wide'],['category','分类'],['url','链接（可留空）'],['image','封面路径（可留空）','wide'],['note','收藏笔记','textarea']]
 };
+fields.site.push(['lifeBackground','life 背景照片路径','wide'],['leafBackground','leaf 背景照片路径','wide'],['bioBackground','个人介绍 / 收藏背景路径','wide'],['eventBackground','时间线背景照片路径','wide']);
 function persist(message = '草稿已保存到当前浏览器') {
   validateContent(data);
   localStorage.setItem(DRAFT_KEY,JSON.stringify(data));
@@ -62,7 +63,7 @@ function isDirty() {
   const form = panel.querySelector('form');
   if(!form)return false;
   const source = section === 'site' ? data.site : data[section].find(x=>x.id===currentId);
-  return [...new FormData(form)].some(([key,value])=>source[key]!==value);
+  return [...new FormData(form)].some(([key,value])=>(source[key] ?? '')!==value);
 }
 async function canLeave(){return !isDirty() || await ask('当前表单尚未保存，放弃这部分编辑？');}
 function commitForm() {
