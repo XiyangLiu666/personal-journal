@@ -3,6 +3,9 @@ name: Publish personal journal
 on:
   push:
     branches: [main]
+    # 只上传照片时不部署；随后保存内容时会一起发布
+    paths-ignore:
+      - 'assets/uploads/**'
   workflow_dispatch:
 
 permissions:

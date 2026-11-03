@@ -3,11 +3,31 @@
 <body class="editor-page">
   <header class="editor-header"><a class="wordmark" href="index.html">未完 <span> / 编辑室</span></a><a href="index.html">返回网站 ↗</a></header>
   <main class="editor-shell">
-    <div class="editor-intro"><span class="tiny-label">a little room for your stories</span><h1>慢慢写，随时回来。</h1><p>这里是本地草稿编辑器。草稿只保存在当前浏览器；导出内容文件并更新到 GitHub 后，网站才会同步。</p></div>
-    <div class="editor-actions"><button id="preview" type="button">预览草稿 ↗</button><button id="export" class="primary" type="button">导出 content.json ↓</button><label class="import-label">导入内容<input type="file" id="import" accept=".json,application/json"></label><span id="save-status" role="status">正在读取内容…</span></div>
+    <div class="editor-intro"><span class="tiny-label">a little room for your stories</span><h1>慢慢写，随时回来。</h1><p>在这里新增、修改、删除网站上的内容，也可以直接上传照片。连接 GitHub 后，点“保存并发布”就会更新网站，大约 1 分钟后生效。</p></div>
+
+    <section class="github-panel" aria-label="GitHub 连接">
+      <div class="github-connected" hidden><span>● 已连接 GitHub，保存后会直接发布到网站</span><button id="disconnect" type="button" class="link-button">断开</button></div>
+      <details class="github-setup" open>
+        <summary>第一次使用：连接 GitHub（每台设备只需一次）</summary>
+        <ol>
+          <li>登录 GitHub 后打开 <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">创建密钥页面 ↗</a>。</li>
+          <li><b>Token name</b> 随便填，例如 journal；<b>Expiration</b> 选一个期限，例如 1 年。</li>
+          <li><b>Repository access</b> 选 <b>Only select repositories</b>，然后选 <b>personal-journal</b>。</li>
+          <li><b>Permissions</b> 中添加 <b>Contents</b>，设为 <b>Read and write</b>。想看到“网站已更新”的提示，可再添加 <b>Actions</b> 设为 Read-only。</li>
+          <li>点 <b>Generate token</b>，复制以 github_pat_ 开头的密钥，粘贴到下面并点连接。</li>
+        </ol>
+        <form id="connect-form"><input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="粘贴 github_pat_ 开头的密钥"><button type="submit" class="primary">连接</button></form>
+        <p class="small-note">密钥只保存在这台设备的浏览器里，不会出现在网站或仓库中。拿到这台设备浏览器的人也能用它发布，公用电脑用完请点断开。</p>
+      </details>
+    </section>
+
+    <div class="editor-actions"><button id="publish" class="primary" type="button" hidden>发布尚未发布的修改 ↑</button><button id="preview" type="button">预览 ↗</button><span id="unpublished-note" hidden>有尚未发布的修改</span><span id="save-status" role="status">正在读取内容…</span></div>
     <div class="editor-workspace"><nav class="editor-tabs" aria-label="内容分类"><button data-section="site" aria-current="page">网站设置</button><button data-section="posts">日记 / life</button><button data-section="photos">照片 / leaf</button><button data-section="timeline">时间线 / days</button><button data-section="favorites">收藏 / collection</button></nav><section id="editor-panel" aria-label="内容编辑区"></section></div>
-    <details class="publishing-help"><summary>如何把更新放到 GitHub？</summary><ol><li>修改内容后，点“预览草稿”查看效果。</li><li>点“导出 content.json”，保留下载文件名为 content.json。</li><li>在 GitHub 仓库打开 data 文件夹，选择 Add file → Upload files，上传该文件并提交。</li><li>照片先上传到仓库 assets 文件夹，在这里填写路径，例如 assets/my-photo.jpg，然后再次导出内容。</li><li>等待 GitHub Actions 部署完成，再刷新正式网站。</li></ol><p>此编辑页不连接 GitHub，也不是登录后台。公开网站上的内容和图片都能被访客读取，请只发布适合公开的信息。</p></details>
-    <button id="reset" class="reset-button" type="button">丢弃当前浏览器草稿，重新读取已发布内容</button>
+
+    <details class="publishing-help"><summary>备份与恢复</summary>
+      <div class="backup-actions"><button id="export" type="button">下载备份 content.json ↓</button><label class="import-label">从备份恢复<input type="file" id="import" accept=".json,application/json"></label><button id="reset" type="button">丢弃这台设备上未发布的修改，重新读取</button></div>
+      <p>每次发布都会在 GitHub 留下记录，误删的内容可以在仓库的历史记录里找回。公开网站上的文字和照片任何人都能看到，请只发布适合公开的内容。</p>
+    </details>
   </main>
 <dialog id="confirm-dialog"><form method="dialog"><p id="confirm-message"></p><div><button value="cancel">取消</button><button value="confirm" class="primary">确认</button></div></form></dialog>
 </body></html>

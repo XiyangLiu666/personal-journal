@@ -1,4 +1,5 @@
 export const DRAFT_KEY = 'meantime-journal-draft-v1';
+export const PREVIEW_KEY = 'meantime-journal-preview-v1';
 export const collections = ['posts', 'photos', 'timeline', 'favorites'];
 export function validateContent(data) {
   if (!data || typeof data !== 'object' || !data.site || typeof data.site !== 'object' || Array.isArray(data.site)) throw new Error('内容需要包含 site 设置。');

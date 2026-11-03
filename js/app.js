@@ -1,4 +1,5 @@
-import {loadContent, validateContent, DRAFT_KEY, safeUrl, escapeHTML as e} from './content.js';
+import {loadContent, validateContent, DRAFT_KEY, PREVIEW_KEY, safeUrl, escapeHTML as e} from './content.js';
+import {rawUrl} from './github.js';
 let data;
 const main = document.querySelector('#main');
 const titles = {life:'life',leaf:'leaf',about:'history',timeline:'event',favorites:'collection',letter:'to me'};
@@ -67,8 +68,9 @@ document.querySelector('#photo-dialog').addEventListener('click',event=>{if(even
 try {
   data=await loadContent();
   if(new URLSearchParams(location.search).get('draft')==='1') {
-    const draft=localStorage.getItem(DRAFT_KEY);
-    if(draft){data=validateContent(JSON.parse(draft));document.querySelector('#draft-banner').hidden=false;}
+    const draft=localStorage.getItem(PREVIEW_KEY) || localStorage.getItem(DRAFT_KEY);
+    // 预览时，刚上传、尚未部署的照片直接从仓库读取
+    if(draft){data=validateContent(JSON.parse(draft.replaceAll('"assets/uploads/',`"${rawUrl('assets/uploads/')}`)));document.querySelector('#draft-banner').hidden=false;}
   }
   document.querySelector('#wordmark').textContent=data.site.title;
   document.querySelector('#since').textContent=`${data.site.subtitle} · since ${data.site.since}`;
