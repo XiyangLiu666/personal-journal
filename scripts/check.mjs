@@ -8,5 +8,5 @@ for (const path of paths) {
   if (!path.startsWith('assets/') || path.includes('..')) throw new Error(`本地图片应位于 assets 文件夹：${path}`);
   await access(new URL(path,root));
 }
-for (const path of ['index.html','editor.html','style.css','editor.css','js/app.js','js/editor.js','js/content.js','js/github.js','assets/favicon.svg']) await access(new URL(path, root));
+for (const path of ['index.html','editor.html','style.css','editor.css','js/app.js','js/editor.js','js/content.js','js/github.js','js/academic.js','assets/favicon.svg']) await access(new URL(path, root));
 console.log(`内容和资源检查通过：${data.posts.length} 篇日记，${data.photos.length} 张照片。`);

@@ -34,3 +34,18 @@ test('图片路径支持仓库子目录，危险链接被拦截',()=>{
 test('导入的 HTML 只显示为文字',()=>{
   assert.equal(escapeHTML('<script>"x"</script>'),'&lt;script&gt;&quot;x&quot;&lt;/script&gt;');
 });
+import {validateAcademic, renderInline, renderHomepage, splitItems} from '../js/academic.js';
+const academic = {profile:{name:'Xiyang Liu',nameZh:'刘喜洋',photo:'images/a.jpg',affiliation:'*Ph.D. Candidate*\n[Xidian](https://en.xidian.edu.cn/)\n\n*Visiting*',contact:'Email: [a@b.c](mailto:a@b.c)'},sections:[{id:'Publications',title:'Selected Publications',nav:'Publications',groups:[{heading:'Journal Papers',kind:'list',gap:18,items:['**[J-1]** **__X. Liu__**, “Title,” 2026. [[Paper](https://ieeexplore.ieee.org/document/1)]']}]}],footer:'© 2026'};
+test('学术经历标记只生成安全的格式与链接',()=>{
+  assert.equal(renderInline('**b** __u__ *i*'),'<b>b</b> <u>u</u> <i>i</i>');
+  assert.match(renderInline('[x](https://a.b)'),/<a href="https:\/\/a.b"/);
+  assert.doesNotMatch(renderInline('<script>x</script> [y](javascript:void)'),/<script|href="javascript/);
+  assert.deepEqual(splitItems('a\nb\n\n\nc'),['a b','c']);
+});
+test('学术主页按原有 jemdoc 样式生成',()=>{
+  const page=renderHomepage(validateAcademic(structuredClone(academic)));
+  assert.match(page,/<a name="Publications"><h2 style="font-size: 25px;"><font color="#483D8B">Selected Publications<\/font><\/h2><\/a>/);
+  assert.match(page,/<li style="margin-bottom: 18px;"><b>\[J-1\]<\/b> <b><u>X. Liu<\/u><\/b>/);
+  assert.match(page,/Xidian<\/font><\/a><br \/><br \/>\n<i>Visiting<\/i>/);
+  const dup=structuredClone(academic);dup.sections.push(dup.sections[0]);assert.throws(()=>validateAcademic(dup),/编号/);
+});

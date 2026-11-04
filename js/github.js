@@ -1,6 +1,7 @@
 // 通过 GitHub API 直接修改仓库：发布 data/content.json、上传照片、查看部署进度。
 // 密钥只保存在当前浏览器的 localStorage 中，不会写进仓库或网页。
 export const repo = {owner: 'XiyangLiu666', name: 'personal-journal', branch: 'main'};
+export const homeRepo = {owner: 'XiyangLiu666', name: 'XiyangLiu666.github.io', branch: 'main'};
 const TOKEN_KEY = 'meantime-journal-github-token-v1';
 const CONTENT_PATH = 'data/content.json';
 
@@ -20,10 +21,15 @@ function explain(status, message) {
   return `GitHub 返回错误 ${status}${message ? '：' + message : ''}`;
 }
 
-async function api(path, {method = 'GET', body, token = getToken()} = {}) {
+function explainHome(status, message) {
+  if (status === 404 || status === 403) return '密钥没有学术主页仓库 XiyangLiu666.github.io 的修改权限。请在 GitHub 编辑这个密钥，在 Repository access 中把它也加进去';
+  return explain(status, message);
+}
+
+async function api(path, {method = 'GET', body, token = getToken(), target = repo} = {}) {
   let response;
   try {
-    response = await fetch(`https://api.github.com/repos/${repo.owner}/${repo.name}${path}`, {
+    response = await fetch(`https://api.github.com/repos/${target.owner}/${target.name}${path}`, {
       method,
       cache: 'no-store',
       headers: {
@@ -40,7 +46,7 @@ async function api(path, {method = 'GET', body, token = getToken()} = {}) {
   if (!response.ok) {
     let message = '';
     try {message = (await response.json()).message || '';} catch {}
-    const error = new Error(explain(response.status, message));
+    const error = new Error(target === repo ? explain(response.status, message) : explainHome(response.status, message));
     error.status = response.status;
     throw error;
   }
@@ -121,3 +127,39 @@ export function uploadPath() {
 }
 
 export const rawUrl = path => `https://raw.githubusercontent.com/${repo.owner}/${repo.name}/${repo.branch}/${path}`;
+
+// 学术主页仓库：读取文件（不存在时返回 null），并把多个文件放进同一次提交
+export async function readHomeFile(path) {
+  try {
+    const file = await api(`/contents/${path}?ref=${homeRepo.branch}`, {target: homeRepo});
+    let encoded = file.encoding === 'base64' ? file.content : '';
+    if (!encoded) encoded = (await api(`/git/blobs/${file.sha}`, {target: homeRepo})).content;
+    return {text: new TextDecoder().decode(fromBase64(encoded)), sha: file.sha};
+  } catch (error) {
+    if (error.status === 404) {
+      try {await api('', {target: homeRepo});} catch {throw error;}
+      return null;
+    }
+    throw error;
+  }
+}
+export async function homeFileSha(path) {
+  try {return (await api(`/contents/${path}?ref=${homeRepo.branch}`, {target: homeRepo})).sha;}
+  catch (error) {if (error.status === 404) return null; throw error;}
+}
+export async function commitHomeFiles(files, message) {
+  const target = homeRepo;
+  const ref = await api(`/git/ref/heads/${target.branch}`, {target});
+  const parent = await api(`/git/commits/${ref.object.sha}`, {target});
+  const tree = await api('/git/trees', {method: 'POST', target, body: {base_tree: parent.tree.sha, tree: files.map(file => ({path: file.path, mode: '100644', type: 'blob', content: file.text}))}});
+  const commit = await api('/git/commits', {method: 'POST', target, body: {message, tree: tree.sha, parents: [ref.object.sha]}});
+  await api(`/git/refs/heads/${target.branch}`, {method: 'PATCH', target, body: {sha: commit.sha}});
+  return commit.sha;
+}
+export async function uploadHomeFile(path, bytes, message) {
+  await api(`/contents/${path.split('/').map(encodeURIComponent).join('/')}`, {method: 'PUT', target: homeRepo, body: {message, content: toBase64(bytes), branch: homeRepo.branch}});
+  return path;
+}
+export async function homePagesStatus() {
+  return api('/pages/builds/latest', {target: homeRepo});
+}

@@ -1,5 +1,6 @@
 import {loadContent, validateContent, DRAFT_KEY, PREVIEW_KEY, safeUrl, escapeHTML as e} from './content.js';
-import {getToken, setToken, verifyToken, readContent, remoteSha, writeContent, uploadFile, deployRun, prepareImage, uploadPath, rawUrl} from './github.js';
+import {getToken, setToken, verifyToken, readContent, remoteSha, writeContent, uploadFile, deployRun, prepareImage, uploadPath, rawUrl, readHomeFile, homeFileSha, commitHomeFiles, uploadHomeFile} from './github.js';
+import {ACADEMIC_ORIGIN, ACADEMIC_PATH, ACADEMIC_PREVIEW_KEY, validateAcademic, renderHomepage, splitItems, joinItems, photoUrl} from './academic.js';
 
 const DRAFT_BASE_KEY = 'meantime-journal-draft-base-v1';
 let data, published = null, baseSha = null, editBase = null, connected = false, busy = false, deployWatch = 0;
@@ -85,6 +86,7 @@ function rowThumb(x) {
 
 function render() {
   document.querySelectorAll('[data-section]').forEach(button => {if (button.dataset.section === section) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current');});
+  if (section === 'academic') {renderAcademic(); return;}
   const item = currentItem();
   if (section === 'site') {
     panel.innerHTML = `<p class="editor-note">网站名称、首页文字、个人介绍和各页面的背景照片。</p>${formHTML(data.site)}`;
@@ -128,6 +130,7 @@ function updateThumb(field) {
 }
 
 function isDirty() {
+  if (section === 'academic') return academicDirty();
   const form = panel.querySelector('form');
   if (!form) return false;
   const source = currentItem();
@@ -301,7 +304,7 @@ async function init(message) {
       } else {localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(DRAFT_BASE_KEY);}
     }
   } catch {}
-  currentId = null; newItem = null;
+  currentId = null; newItem = null; academicState = null; academicLoad = null;
   updateGithubPanel(); render(); updatePublishState();
   if (note) setStatus(note, tone);
   else if (message) setStatus(message, 'ok');
@@ -369,5 +372,187 @@ document.querySelector('#reset').addEventListener('click', async () => {
 });
 window.addEventListener('beforeunload', event => {if (data && (isDirty() || busy)) {event.preventDefault(); event.returnValue = '';}});
 
+/* ---------- 学术经历：编辑后同步到 XiyangLiu666.github.io ---------- */
+const ACADEMIC_DRAFT_KEY = 'meantime-journal-academic-draft-v1';
+let academicState = null, academicPublished = null, academicSha = null, indexSha = null, academicLoad = null, academicNote = '';
+const academicPreviews = new Map();
+
+function academicThumb(value) {
+  const src = academicPreviews.get(value) || photoUrl(value);
+  return src ? `<img src="${e(src)}" alt="">` : '<em>暂无照片</em>';
+}
+async function loadAcademicEditor() {
+  academicNote = ''; academicSha = null; indexSha = null;
+  let loaded = null;
+  if (connected) {
+    try {
+      const file = await readHomeFile(ACADEMIC_PATH);
+      if (file) {loaded = validateAcademic(JSON.parse(file.text)); academicSha = file.sha;}
+      indexSha = await homeFileSha('index.html');
+    } catch (error) {academicNote = error.message;}
+  }
+  if (!loaded) {
+    const response = await fetch(`${ACADEMIC_ORIGIN}${ACADEMIC_PATH}?t=${Date.now()}`, {cache: 'no-store'});
+    if (!response.ok) throw new Error('无法读取学术主页上的 data/academic.json');
+    loaded = validateAcademic(await response.json());
+  }
+  academicPublished = canon(loaded);
+  academicState = loaded;
+  try {
+    const stored = localStorage.getItem(ACADEMIC_DRAFT_KEY);
+    if (stored) {
+      const draft = validateAcademic(JSON.parse(stored));
+      if (canon(draft) !== academicPublished) {academicState = draft; academicNote = academicNote || '这台设备上有尚未发布的学术经历修改，点“保存并发布”即可上线。';}
+      else localStorage.removeItem(ACADEMIC_DRAFT_KEY);
+    }
+  } catch {}
+}
+function renderAcademic() {
+  if (!academicState) {
+    panel.innerHTML = '<p class="editor-note">正在读取学术经历……</p>';
+    academicLoad ||= loadAcademicEditor().catch(error => {academicNote = `读取失败：${error.message}`;});
+    academicLoad.then(() => {if (section === 'academic') {if (academicState) renderAcademic(); else panel.innerHTML = `<p class="inline-message">${e(academicNote)}</p>`;}});
+    return;
+  }
+  const a = academicState, p = a.profile;
+  const outline = [`<button type="button" data-ajump="ae-profile">基本信息</button>`, ...a.sections.map((section, i) => `<button type="button" data-ajump="ae-s-${i}">${e(section.nav || section.title)}</button>`)].join('<span>｜</span>');
+  const groupHTML = (group, i, j) => `<div class="academic-group"><div class="group-head"><label>小标题（可留空）<input data-path="sections.${i}.groups.${j}.heading" value="${e(group.heading || '')}"></label><label>形式<select data-path="sections.${i}.groups.${j}.kind"><option value="list" ${group.kind === 'list' ? 'selected' : ''}>列表（每条前有圆点）</option><option value="text" ${group.kind === 'text' ? 'selected' : ''}>段落</option></select></label><button type="button" class="link-button" data-remove-group="${i},${j}">删除分组</button></div><label class="wide">内容（每一条或每一段之间空一行）<textarea data-path="sections.${i}.groups.${j}.items" rows="${Math.min(16, Math.max(4, group.items.length * 3 + 1))}">${e(joinItems(group.items))}</textarea></label></div>`;
+  const sectionHTML = (section, i) => `<fieldset class="wide academic-card" id="ae-s-${i}"><legend>${e(section.title)}</legend><div class="card-tools"><button type="button" class="link-button" data-move="${i},-1" ${i === 0 ? 'disabled' : ''}>上移</button><button type="button" class="link-button" data-move="${i},1" ${i === a.sections.length - 1 ? 'disabled' : ''}>下移</button><button type="button" class="link-button danger" data-remove-section="${i}">删除板块</button></div><div class="card-grid"><label>板块标题<input data-path="sections.${i}.title" value="${e(section.title)}" required></label><label>大纲中的名称<input data-path="sections.${i}.nav" value="${e(section.nav || '')}" placeholder="留空则与标题相同"></label></div>${section.groups.map((group, j) => groupHTML(group, i, j)).join('')}<button type="button" class="add-button" data-add-group="${i}">＋ 添加分组</button></fieldset>`;
+  panel.innerHTML = `<p class="editor-note">保存后同步更新学术主页 <a href="${ACADEMIC_ORIGIN}" target="_blank" rel="noopener noreferrer">xiyangliu666.github.io ↗</a> 和这里的 academic 页面。写法：**粗体**　__下划线__　*斜体*　[文字](链接)。</p>
+<nav class="academic-jump" aria-label="学术经历大纲">${outline}</nav>
+<form class="editor-form academic-form" novalidate>
+<fieldset class="wide academic-card" id="ae-profile"><legend>基本信息</legend><div class="card-grid"><label>英文名字<input data-path="profile.name" value="${e(p.name)}" required></label><label>中文名字<input data-path="profile.nameZh" value="${e(p.nameZh || '')}"></label></div>
+<div class="field image-field" data-field="photo"><span>照片</span><div class="image-row"><div class="image-thumb">${academicThumb(p.photo)}</div><div class="image-controls"><label class="upload-button"><span>换一张照片</span><input type="file" accept="image/*,.heic,.heif" data-academic-upload></label><input type="text" data-path="profile.photo" value="${e(p.photo || '')}" aria-label="照片路径"></div></div></div>
+<label class="wide">身份与单位（每行一项，空一行分组）<textarea data-path="profile.affiliation" rows="8">${e(p.affiliation || '')}</textarea></label>
+<label class="wide">联系方式<textarea data-path="profile.contact" rows="3">${e(p.contact || '')}</textarea></label>
+<label class="wide">页面底部文字<input data-path="footer" value="${e(a.footer || '')}"></label></fieldset>
+${a.sections.map(sectionHTML).join('')}
+<div class="wide"><button type="button" class="add-button" data-add-section>＋ 新增板块</button></div>
+<div class="wide form-actions academic-actions"><button class="save-record" type="submit">${connected ? '保存并发布' : '保存到这台设备'}</button><button type="button" class="cancel-record" data-academic-preview>预览 ↗</button><button type="button" class="link-button" data-academic-reset>放弃修改，重新读取</button></div>
+</form>`;
+  bindAcademicEditor();
+  if (academicNote) {setStatus(academicNote, academicNote.includes('权限') || academicNote.includes('失败') ? 'error' : 'warn'); academicNote = '';}
+}
+function setPath(target, path, value) {
+  const keys = path.split('.');
+  let node = target;
+  for (const key of keys.slice(0, -1)) node = node[key];
+  node[keys.at(-1)] = keys.at(-1) === 'items' ? splitItems(value) : value;
+}
+function collectAcademic() {
+  const next = structuredClone(academicState);
+  panel.querySelectorAll('[data-path]').forEach(el => setPath(next, el.dataset.path, el.value));
+  return next;
+}
+function academicDirty() {
+  if (!academicState || !panel.querySelector('.academic-form')) return false;
+  return canon(collectAcademic()) !== canon(academicState);
+}
+function restructure(change) {
+  academicState = collectAcademic();
+  change(academicState);
+  try {localStorage.setItem(ACADEMIC_DRAFT_KEY, canon(academicState));} catch {}
+  renderAcademic();
+  setStatus('有尚未保存的修改', 'warn');
+}
+function uniqueId(title, sections) {
+  const base = title.trim() || 'Section';
+  let id = base, n = 2;
+  while (sections.some(s => s.id === id)) id = `${base} ${n++}`;
+  return id;
+}
+function bindAcademicEditor() {
+  const form = panel.querySelector('.academic-form');
+  panel.querySelectorAll('[data-ajump]').forEach(button => button.addEventListener('click', () => document.getElementById(button.dataset.ajump)?.scrollIntoView({behavior: 'smooth', block: 'start'})));
+  form.addEventListener('input', () => {if (!busy) setStatus('有尚未保存的修改', 'warn');});
+  form.addEventListener('submit', event => {event.preventDefault(); saveAcademic();});
+  form.querySelectorAll('[data-move]').forEach(button => button.addEventListener('click', () => {
+    const [i, d] = button.dataset.move.split(',').map(Number);
+    restructure(a => {const [item] = a.sections.splice(i, 1); a.sections.splice(i + d, 0, item);});
+  }));
+  form.querySelectorAll('[data-remove-section]').forEach(button => button.addEventListener('click', async () => {
+    const i = Number(button.dataset.removeSection);
+    if (await ask(`删除板块“${academicState.sections[i].title}”？保存后才会生效。`, '删除')) restructure(a => a.sections.splice(i, 1));
+  }));
+  form.querySelectorAll('[data-add-group]').forEach(button => button.addEventListener('click', () => restructure(a => a.sections[Number(button.dataset.addGroup)].groups.push({heading: '', kind: 'list', items: [], gap: 8}))));
+  form.querySelectorAll('[data-remove-group]').forEach(button => button.addEventListener('click', async () => {
+    const [i, j] = button.dataset.removeGroup.split(',').map(Number);
+    if (await ask('删除这个分组和其中的内容？保存后才会生效。', '删除')) restructure(a => a.sections[i].groups.splice(j, 1));
+  }));
+  form.querySelector('[data-add-section]').addEventListener('click', () => {
+    restructure(a => a.sections.push({id: `new-${crypto.randomUUID()}`, title: '新的板块', nav: '', groups: [{heading: '', kind: 'list', items: [], gap: 8}]}));
+    const cards = panel.querySelectorAll('.academic-card');
+    cards[cards.length - 1].scrollIntoView({behavior: 'smooth', block: 'center'});
+    cards[cards.length - 1].querySelector('input').select();
+  });
+  form.querySelector('[data-academic-preview]').addEventListener('click', () => {
+    try {
+      const preview = finalizeAcademic(collectAcademic());
+      localStorage.setItem(ACADEMIC_PREVIEW_KEY, canon(preview));
+      window.open('index.html?draft=1#academic', '_blank', 'noopener');
+    } catch (error) {setStatus(`无法预览：${error.message}`, 'error');}
+  });
+  form.querySelector('[data-academic-reset]').addEventListener('click', async () => {
+    if (!await ask('放弃学术经历中尚未发布的修改，重新读取已发布的内容？', '重新读取')) return;
+    try {localStorage.removeItem(ACADEMIC_DRAFT_KEY);} catch {}
+    academicState = null; academicLoad = null; renderAcademic();
+  });
+  const upload = form.querySelector('[data-academic-upload]');
+  upload.addEventListener('change', async () => {
+    const file = upload.files[0]; upload.value = '';
+    if (!file || busy) return;
+    if (!connected) {setStatus('请先在上方连接 GitHub，才能上传照片。', 'warn'); focusConnect(); return;}
+    const field = upload.closest('.image-field'), text = field.querySelector('input[type="text"]');
+    setBusy(true); setStatus('正在压缩并上传照片…');
+    try {
+      const blob = await prepareImage(file);
+      const path = uploadPath().replace('assets/uploads/', 'images/uploads/');
+      await uploadHomeFile(path, new Uint8Array(await blob.arrayBuffer()), `上传照片 ${path}`);
+      academicPreviews.set(path, URL.createObjectURL(blob));
+      text.value = path;
+      field.querySelector('.image-thumb').innerHTML = academicThumb(path);
+      setBusy(false); setStatus('照片已上传 ✓ 记得点“保存并发布”', 'ok');
+    } catch (error) {setBusy(false); setStatus(`照片上传失败：${error.message}`, 'error');}
+  });
+  form.querySelector('[data-path="profile.photo"]').addEventListener('change', event => {event.target.closest('.image-field').querySelector('.image-thumb').innerHTML = academicThumb(event.target.value.trim());});
+}
+function finalizeAcademic(next) {
+  for (const section of next.sections) {
+    section.title = section.title.trim();
+    if (!section.title) throw new Error('有板块没有填写标题');
+    if (section.id.startsWith('new-')) section.id = uniqueId(section.title, next.sections);
+    if (!section.nav || section.nav.trim() === section.title) section.nav = section.title;
+    section.groups = section.groups.filter(group => group.items.length || group.heading.trim());
+  }
+  return validateAcademic(next);
+}
+async function saveAcademic() {
+  if (busy) return;
+  let next;
+  try {next = finalizeAcademic(collectAcademic());} catch (error) {setStatus(`未保存：${error.message}`, 'error'); return;}
+  academicState = next;
+  try {localStorage.setItem(ACADEMIC_DRAFT_KEY, canon(next));} catch {}
+  if (!connected) {renderAcademic(); setStatus('已保存到这台设备。连接 GitHub 后才能同步到学术主页。', 'warn'); return;}
+  setBusy(true); setStatus('正在更新学术主页…');
+  try {
+    const [jsonNow, indexNow] = await Promise.all([homeFileSha(ACADEMIC_PATH), homeFileSha('index.html')]);
+    if ((academicSha && jsonNow !== academicSha) || (indexSha && indexNow !== indexSha)) {
+      setBusy(false);
+      if (!await ask('学术主页在别处被修改过（例如直接在 GitHub 上改了 index.html）。继续会用这里的内容覆盖那些修改，确定吗？', '覆盖并发布')) {setStatus('已取消，修改仍保存在这台设备上。', 'warn'); renderAcademic(); return;}
+      setBusy(true);
+    }
+    await commitHomeFiles([{path: ACADEMIC_PATH, text: JSON.stringify(next, null, 2) + '\n'}, {path: 'index.html', text: renderHomepage(next)}], '更新学术经历');
+    [academicSha, indexSha] = await Promise.all([homeFileSha(ACADEMIC_PATH), homeFileSha('index.html')]);
+    academicPublished = canon(next);
+    try {localStorage.removeItem(ACADEMIC_DRAFT_KEY);} catch {}
+    setBusy(false); renderAcademic();
+    setStatus('已发布 ✓ 学术主页和 academic 页面大约 1 分钟后更新', 'ok', {href: ACADEMIC_ORIGIN, text: '打开学术主页 ↗'});
+  } catch (error) {
+    setBusy(false); renderAcademic();
+    setStatus(`发布失败：${error.message}。修改已保存在这台设备上。`, 'error');
+  }
+}
+
+if (location.hash === '#academic') section = 'academic';
 try {await init();}
 catch (error) {panel.innerHTML = `<p class="inline-message">无法读取内容：${e(error.message)}。请通过网站地址或本地预览打开本页面。</p>`; setStatus('读取失败', 'error');}

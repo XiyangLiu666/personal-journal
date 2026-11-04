@@ -25,6 +25,14 @@ python3 -m http.server 4173 --bind 127.0.0.1
 
 没有连接 GitHub 时，修改只保存在当前浏览器，页面上会出现“发布”按钮，连接后点一下即可上线。“备份与恢复”中可以下载或导入 `content.json`。每次发布都会在 GitHub 留下一次提交，误删的内容可以在仓库历史里找回。
 
+### 学术经历（academic）
+
+首页的“学术经历 ↗”和底部导航的 academic 打开学术经历页面，左侧大纲点击即可定位。内容来自学术主页仓库 [XiyangLiu666.github.io](https://github.com/XiyangLiu666/XiyangLiu666.github.io) 的 `data/academic.json`。
+
+在编辑页选“学术经历 / academic”修改，可以编辑基本信息、增删板块和分组、调整顺序。点“保存并发布”后，学术主页的 `data/academic.json` 和 `index.html` 一起更新（主页保持原来的样式），这里的 academic 页面也随之更新。写法：`**粗体**`、`__下划线__`、`*斜体*`、`[文字](链接)`，列表中每一条之间空一行。
+
+使用这个功能时，GitHub 密钥的 Repository access 需要同时包含 `personal-journal` 和 `XiyangLiu666.github.io`。已有的密钥可以在 GitHub 的 Settings → Developer settings → Fine-grained tokens 中编辑并添加仓库，不需要重新生成。
+
 ### 关于密钥
 
 密钥只保存在当前设备的浏览器中，不会写进网站或仓库。建议只授权 `personal-journal` 一个仓库、只给 Contents 读写权限，并设置过期时间；过期后重新生成并连接即可。在公用电脑上用完请点“断开”。如果担心密钥泄露，可在 GitHub 的 Settings → Developer settings → Personal access tokens 中删除它。
@@ -43,6 +51,7 @@ python3 -m http.server 4173 --bind 127.0.0.1
 | about | 名字、自我介绍、近况 | `site` |
 | days | event 形式的白色内容面板、分页记录 | `timeline` |
 | collection | 书、音乐、地点及链接 | `favorites` |
+| academic | 学术经历，左侧大纲定位 | 学术主页仓库 `data/academic.json` |
 | to me | 写给自己的信、可选邮箱 | `site` |
 
 正文使用空行分段，普通换行也会保留；内容按纯文字渲染，不执行 HTML。日期为 `YYYY-MM-DD`。日记、照片和时间线按日期倒序显示。每条记录的 `id` 应唯一且稳定，编辑器会自动创建。
