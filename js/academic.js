@@ -7,6 +7,10 @@ export const ACADEMIC_PREVIEW_KEY = 'meantime-journal-academic-preview-v1';
 
 const esc = value => String(value ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 
+export const KINDS = ['text', 'list', 'journal', 'conference', 'patent'];
+export const STRUCTURED = ['journal', 'conference', 'patent'];
+export const KIND_LABELS = {list: '列表', text: '段落', journal: '期刊论文（自动编号）', conference: '会议论文（自动编号）', patent: '专利'};
+
 export function validateAcademic(data) {
   if (!data || typeof data !== 'object' || !data.profile || typeof data.profile !== 'object') throw new Error('学术经历需要包含 profile。');
   for (const key of ['name', 'nameZh', 'photo', 'affiliation', 'contact']) if (typeof (data.profile[key] ?? '') !== 'string') throw new Error(`profile.${key} 必须是文字。`);
@@ -19,7 +23,13 @@ export function validateAcademic(data) {
     ids.add(section.id);
     if (!Array.isArray(section.groups)) throw new Error(`板块“${section.title}”缺少内容分组。`);
     for (const group of section.groups) {
-      if (!group || !['text', 'list'].includes(group.kind) || !Array.isArray(group.items) || group.items.some(item => typeof item !== 'string')) throw new Error(`板块“${section.title}”中有格式不正确的分组。`);
+      if (!group || !KINDS.includes(group.kind) || !Array.isArray(group.items)) throw new Error(`板块“${section.title}”中有格式不正确的分组。`);
+      if (['text', 'list'].includes(group.kind) && group.items.some(item => typeof item !== 'string')) throw new Error(`板块“${section.title}”中有格式不正确的条目。`);
+      if (STRUCTURED.includes(group.kind)) for (const item of group.items) {
+        if (!item || typeof item !== 'object' || typeof item.title !== 'string' || !item.title.trim()) throw new Error(`板块“${section.title}”中有条目没有题目。`);
+        if (typeof item.id !== 'string' || !item.id) throw new Error(`板块“${section.title}”中有条目缺少编号。`);
+        for (const key of group.kind === 'patent' ? ['inventors'] : ['authors']) if (!Array.isArray(item[key] ?? [])) throw new Error(`“${item.title}”的${key === 'inventors' ? '发明人' : '作者'}格式不正确。`);
+      }
     }
   }
   return data;
@@ -51,6 +61,42 @@ export const splitItems = value => String(value ?? '').split(/\n\s*\n/).map(item
 export const joinItems = items => items.join('\n\n');
 export const photoUrl = photo => photo ? new URL(photo, ACADEMIC_ORIGIN).href : '';
 
+// 作者名缩写：Xiyang Liu → X. Liu
+export function shortName(given, family) {
+  const initials = String(given || '').trim().split(/\s+/).filter(Boolean).map(part => part.split('-').map(p => p ? p[0].toUpperCase() + '.' : '').join('-')).join(' ');
+  return [initials, String(family || '').trim()].filter(Boolean).join(' ');
+}
+function selfNames(profile) {
+  const names = new Set((profile?.selfNames || []).map(x => x.trim()).filter(Boolean));
+  const parts = String(profile?.name || '').trim().split(/\s+/);
+  if (parts.length > 1) names.add(shortName(parts.slice(0, -1).join(' '), parts.at(-1)));
+  if (profile?.nameZh) names.add(profile.nameZh.trim());
+  return names;
+}
+const joinAuthors = list => list.length < 3 ? list.join(' and ') : `${list.slice(0, -1).join(', ')}, and ${list.at(-1)}`;
+const sortKey = item => String(item.date || item.year || '');
+export function sortedItems(group) {
+  if (group.kind === 'journal' || group.kind === 'conference') return [...group.items].sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
+  return group.items;
+}
+// 每个分组按显示顺序返回条目的标记文本（论文自动排序、编号）
+export function displayItems(group, profile) {
+  if (!STRUCTURED.includes(group.kind)) return group.items;
+  const mine = selfNames(profile);
+  const mark = name => mine.has(String(name).trim()) ? `**__${name}__**` : name;
+  const items = sortedItems(group);
+  if (group.kind === 'patent') return items.map(item => `${item.title}，发明人：${(item.inventors || []).map(mark).join('，')}${item.number ? `，${item.numberLabel || '公开号'}：${item.number}` : ''}。`);
+  const prefix = group.kind === 'journal' ? 'J' : 'C';
+  return items.map((item, i) => {
+    const year = String(item.year || item.date || '').slice(0, 4);
+    const tag = item.abbr ? `${item.abbr}'${year.slice(2)}` : year;
+    const title = /[?!？！]$/.test(item.title.trim()) ? `“${item.title.trim()}”` : `“${item.title.trim()},”`;
+    const venue = item.venue ? ` **${item.venue}${item.abbr ? ` (${item.abbr})` : ''}**,` : '';
+    const tail = (item.extra || year || '').trim().replace(/\.$/, '');
+    return `**[${prefix}-${items.length - i}${tag ? `, ${tag}` : ''}]** ${joinAuthors((item.authors || []).map(mark))}, ${title}${venue} ${tail}.${item.url ? ` [[Paper](${item.url})]` : ''}`.replace(/\s+/g, ' ');
+  });
+}
+
 // 生成与原学术主页（jemdoc 风格）一致的 index.html
 export function renderHomepage(data) {
   validateAcademic(data);
@@ -63,9 +109,10 @@ export function renderHomepage(data) {
   const sections = data.sections.map(section => {
     const body = section.groups.map(group => {
       const heading = group.heading ? `<p style="font-size: 22px;"><b><font color="#483D8B">${inline(group.heading)}</font></b></p>\n` : '';
-      if (group.kind === 'text') return heading + group.items.map(item => `<p style="font-size: 20px;">\n${inline(item)}\n</p>`).join('\n');
+      const items = displayItems(group, p);
+      if (group.kind === 'text') return heading + items.map(item => `<p style="font-size: 20px;">\n${inline(item)}\n</p>`).join('\n');
       const gap = Number.isFinite(group.gap) ? group.gap : 8;
-      return `${heading}<ul style="font-size: 20px;">\n${group.items.map(item => `<li style="margin-bottom: ${gap}px;">${inline(item)}</li>`).join('\n')}\n</ul>`;
+      return `${heading}<ul style="font-size: 20px;">\n${items.map(item => `<li style="margin-bottom: ${gap}px;">${inline(item)}</li>`).join('\n')}\n</ul>`;
     }).join('\n\n');
     return `<a name="${esc(section.id)}"><h2 style="font-size: 25px;"><font color="#483D8B">${esc(section.title)}</font></h2></a>\n${body}`;
   }).join('\n\n');

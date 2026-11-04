@@ -1,6 +1,6 @@
 import {loadContent, validateContent, DRAFT_KEY, PREVIEW_KEY, safeUrl, escapeHTML as e} from './content.js';
 import {rawUrl} from './github.js';
-import {ACADEMIC_ORIGIN, ACADEMIC_PATH, ACADEMIC_PREVIEW_KEY, validateAcademic, renderInline, photoUrl} from './academic.js';
+import {ACADEMIC_ORIGIN, ACADEMIC_PATH, ACADEMIC_PREVIEW_KEY, validateAcademic, renderInline, photoUrl, displayItems} from './academic.js';
 let data, academic = null, academicError = '', academicLoading = null;
 const isDraft = new URLSearchParams(location.search).get('draft')==='1';
 const main = document.querySelector('#main');
@@ -43,7 +43,7 @@ function academicHTML() {
     const p = academic.profile;
     const lines = String(p.affiliation || '').split(/\n\s*\n/).map(block=>`<p>${block.split('\n').map(line=>renderInline(line)).join('<br>')}</p>`).join('');
     const photo = photoUrl(p.photo);
-    const sections = academic.sections.map((section,i)=>`<section class="academic-section" id="academic-${i}"><h2>${e(section.title)}</h2>${section.groups.map(group=>`${group.heading?`<h3>${renderInline(group.heading)}</h3>`:''}${group.kind==='text'?group.items.map(item=>`<p>${renderInline(item)}</p>`).join(''):`<ul>${group.items.map(item=>`<li>${renderInline(item)}</li>`).join('')}</ul>`}`).join('')}</section>`).join('');
+    const sections = academic.sections.map((section,i)=>`<section class="academic-section" id="academic-${i}"><h2>${e(section.title)}</h2>${section.groups.map(group=>`${group.heading?`<h3>${renderInline(group.heading)}</h3>`:''}${group.kind==='text'?displayItems(group,p).map(item=>`<p>${renderInline(item)}</p>`).join(''):`<ul>${displayItems(group,p).map(item=>`<li>${renderInline(item)}</li>`).join('')}</ul>`}`).join('')}</section>`).join('');
     body = `<article class="academic-profile">${photo?`<img src="${e(photo)}" alt="${e(p.name)}">`:''}<div><h2>${e(p.name)}${p.nameZh?` <span>${e(p.nameZh)}</span>`:''}</h2>${lines}<p class="academic-contact">${renderInline(p.contact)}</p></div></article>${sections}<p class="academic-edit"><a href="editor.html#academic">edit</a></p>`;
   }
   return `<div class="academic-columns">${outline}${panel('academic',body,'academic-panel')}</div>`;

@@ -1,6 +1,7 @@
 import {loadContent, validateContent, DRAFT_KEY, PREVIEW_KEY, safeUrl, escapeHTML as e} from './content.js';
 import {getToken, setToken, verifyToken, readContent, remoteSha, writeContent, uploadFile, deployRun, prepareImage, uploadPath, rawUrl, readHomeFile, homeFileSha, commitHomeFiles, uploadHomeFile} from './github.js';
-import {ACADEMIC_ORIGIN, ACADEMIC_PATH, ACADEMIC_PREVIEW_KEY, validateAcademic, renderHomepage, splitItems, joinItems, photoUrl} from './academic.js';
+import {ACADEMIC_ORIGIN, ACADEMIC_PATH, ACADEMIC_PREVIEW_KEY, validateAcademic, renderHomepage, renderInline, displayItems, sortedItems, STRUCTURED, KIND_LABELS, photoUrl} from './academic.js';
+import {lookupPaper} from './paper-lookup.js';
 
 const DRAFT_BASE_KEY = 'meantime-journal-draft-base-v1';
 let data, published = null, baseSha = null, editBase = null, connected = false, busy = false, deployWatch = 0;
@@ -407,6 +408,51 @@ async function loadAcademicEditor() {
     }
   } catch {}
 }
+
+let openItems = new Set(), academicLookupBusy = false;
+const field = (path, label, value, opts = {}) => `<label class="${opts.wide ? 'wide' : ''}">${label}${opts.textarea ? `<textarea data-path="${path}" rows="${opts.rows || 2}" placeholder="${e(opts.placeholder || '')}">${e(value ?? '')}</textarea>` : opts.select ? `<select data-path="${path}">${opts.select.map(v => `<option ${v === value ? 'selected' : ''}>${v}</option>`).join('')}</select>` : `<input data-path="${path}" value="${e(value ?? '')}" placeholder="${e(opts.placeholder || '')}">`}</label>`;
+function importBoxHTML(i) {
+  return `<div class="import-box"><span>添加论文：粘贴链接自动识别（支持 IEEE Xplore、DOI、arXiv），也可以手动添加。论文按日期从新到旧自动排序和编号。</span><div class="import-row"><input data-import-input="${i}" placeholder="例如 https://ieeexplore.ieee.org/document/11161010"><button type="button" class="import-button" data-import="${i}">自动识别</button></div><div class="import-row"><button type="button" class="link-button" data-manual="${i},journal">＋ 手动添加期刊论文</button><button type="button" class="link-button" data-manual="${i},conference">＋ 手动添加会议论文</button></div></div>`;
+}
+function itemTools(i, j, k, n, movable) {
+  return `<div class="row-tools">${movable ? `<button type="button" class="link-button" data-item-move="${i},${j},${k},-1" ${k === 0 ? 'disabled' : ''}>上移</button><button type="button" class="link-button" data-item-move="${i},${j},${k},1" ${k === n - 1 ? 'disabled' : ''}>下移</button>` : ''}<button type="button" class="link-button danger" data-item-remove="${i},${j},${k}">删除</button></div>`;
+}
+function structuredFields(kind, base, item) {
+  if (kind === 'patent') return `<div class="item-fields">${field(`${base}.title`, '专利名称', item.title, {wide: true})}${field(`${base}.inventors`, '发明人（用逗号分隔，按顺序）', (item.inventors || []).join('，'), {wide: true})}${field(`${base}.numberLabel`, '号码类型', item.numberLabel || '公开号', {select: ['公开号', '申请号', '授权号', '专利号']})}${field(`${base}.number`, '号码', item.number)}</div>`;
+  return `<div class="item-fields">${field(`${base}.authors`, '作者（用英文逗号分隔，按顺序；你的名字会自动加粗加下划线）', (item.authors || []).join(', '), {wide: true, textarea: true})}${field(`${base}.title`, '题目', item.title, {wide: true, textarea: true})}${field(`${base}.venue`, kind === 'journal' ? '期刊全称' : '会议全称', item.venue, {wide: true})}${field(`${base}.abbr`, '简称（用于编号，例如 TCOM、ICC）', item.abbr)}${field(`${base}.date`, '日期（用于排序，可只填年份或年月，如 2026-06）', item.date)}${field(`${base}.extra`, '出版信息（可留空，默认显示年份）', item.extra, {wide: true, placeholder: kind === 'journal' ? '例如 vol. 74, no. 3, pp. 1–15, 2026' : '例如 Montreal, Canada, Jun. 8–12, 2025'})}${field(`${base}.url`, '论文链接（可留空）', item.url, {wide: true})}${field(`${base}.doi`, 'DOI（可留空）', item.doi)}</div>`;
+}
+function groupHTML(group, i, j, profile) {
+  const structured = STRUCTURED.includes(group.kind);
+  const kindControl = structured || group.items.length === 0 && false ? `<label>形式<span class="kind-label">${KIND_LABELS[group.kind]}</span></label>` : `<label>形式<select data-path="sections.${i}.groups.${j}.kind">${(group.items.length ? ['list', 'text'] : ['list', 'text', 'journal', 'conference', 'patent']).map(k => `<option value="${k}" ${group.kind === k ? 'selected' : ''}>${KIND_LABELS[k]}</option>`).join('')}</select></label>`;
+  const previews = displayItems(group, profile);
+  const n = group.items.length;
+  const rows = group.items.map((item, k) => {
+    const base = `sections.${i}.groups.${j}.items.${k}`;
+    if (!structured) return `<li class="item-row">${field(base, '', item, {textarea: true, rows: group.kind === 'text' ? 5 : 2, wide: true})}${itemTools(i, j, k, n, true)}</li>`;
+    return `<li class="item-row structured"><details data-item-id="${e(item.id)}" ${openItems.has(item.id) ? 'open' : ''}><summary><span class="item-preview">${renderInline(previews[k])}</span><span class="edit-hint">编辑</span></summary>${structuredFields(group.kind, base, item)}</details>${itemTools(i, j, k, n, group.kind === 'patent')}</li>`;
+  }).join('');
+  const addLabel = group.kind === 'patent' ? '＋ 添加专利' : group.kind === 'text' ? '＋ 添加一段' : group.kind === 'list' ? '＋ 添加一条' : '';
+  return `<div class="academic-group"><div class="group-head"><label>小标题（可留空）<input data-path="sections.${i}.groups.${j}.heading" value="${e(group.heading || '')}"></label>${kindControl}<button type="button" class="link-button" data-remove-group="${i},${j}">删除分组</button></div><ol class="item-rows">${rows || '<li class="item-empty">还没有内容</li>'}</ol>${addLabel ? `<button type="button" class="add-button" data-add-item="${i},${j}">${addLabel}</button>` : ''}</div>`;
+}
+const today4 = () => String(new Date().getFullYear());
+const blankPaper = () => ({id: `item-${crypto.randomUUID().slice(0, 10)}`, authors: [], title: '', venue: '', abbr: '', year: today4(), date: today4(), extra: '', url: '', doi: ''});
+const blankPatent = () => ({id: `item-${crypto.randomUUID().slice(0, 10)}`, title: '', inventors: [], numberLabel: '公开号', number: '', date: ''});
+function paperGroup(section, kind) {
+  let group = section.groups.find(g => g.kind === kind);
+  if (!group) {
+    group = {heading: kind === 'journal' ? 'Journal Papers' : 'Conference Papers', kind, items: [], gap: 18};
+    if (kind === 'journal') section.groups.unshift(group); else section.groups.push(group);
+  }
+  return group;
+}
+function rememberOpen() {panel.querySelectorAll('details[data-item-id]').forEach(d => {if (d.open) openItems.add(d.dataset.itemId); else openItems.delete(d.dataset.itemId);});}
+function focusItem(id) {
+  const details = panel.querySelector(`details[data-item-id="${CSS.escape(id)}"]`);
+  if (!details) return;
+  details.open = true;
+  details.scrollIntoView({behavior: 'smooth', block: 'center'});
+  details.querySelector('input, textarea')?.focus({preventScroll: true});
+}
 function renderAcademic() {
   if (!academicState) {
     panel.innerHTML = '<p class="editor-note">正在读取学术经历……</p>';
@@ -415,9 +461,9 @@ function renderAcademic() {
     return;
   }
   const a = academicState, p = a.profile;
+  for (const section of a.sections) for (const group of section.groups) if (group.kind === 'journal' || group.kind === 'conference') group.items = sortedItems(group);
   const outline = [`<button type="button" data-ajump="ae-profile">基本信息</button>`, ...a.sections.map((section, i) => `<button type="button" data-ajump="ae-s-${i}">${e(section.nav || section.title)}</button>`)].join('<span>｜</span>');
-  const groupHTML = (group, i, j) => `<div class="academic-group"><div class="group-head"><label>小标题（可留空）<input data-path="sections.${i}.groups.${j}.heading" value="${e(group.heading || '')}"></label><label>形式<select data-path="sections.${i}.groups.${j}.kind"><option value="list" ${group.kind === 'list' ? 'selected' : ''}>列表（每条前有圆点）</option><option value="text" ${group.kind === 'text' ? 'selected' : ''}>段落</option></select></label><button type="button" class="link-button" data-remove-group="${i},${j}">删除分组</button></div><label class="wide">内容（每一条或每一段之间空一行）<textarea data-path="sections.${i}.groups.${j}.items" rows="${Math.min(16, Math.max(4, group.items.length * 3 + 1))}">${e(joinItems(group.items))}</textarea></label></div>`;
-  const sectionHTML = (section, i) => `<fieldset class="wide academic-card" id="ae-s-${i}"><legend>${e(section.title)}</legend><div class="card-tools"><button type="button" class="link-button" data-move="${i},-1" ${i === 0 ? 'disabled' : ''}>上移</button><button type="button" class="link-button" data-move="${i},1" ${i === a.sections.length - 1 ? 'disabled' : ''}>下移</button><button type="button" class="link-button danger" data-remove-section="${i}">删除板块</button></div><div class="card-grid"><label>板块标题<input data-path="sections.${i}.title" value="${e(section.title)}" required></label><label>大纲中的名称<input data-path="sections.${i}.nav" value="${e(section.nav || '')}" placeholder="留空则与标题相同"></label></div>${section.groups.map((group, j) => groupHTML(group, i, j)).join('')}<button type="button" class="add-button" data-add-group="${i}">＋ 添加分组</button></fieldset>`;
+  const sectionHTML = (section, i) => `<fieldset class="wide academic-card" id="ae-s-${i}"><legend>${e(section.title)}</legend><div class="card-tools"><button type="button" class="link-button" data-move="${i},-1" ${i === 0 ? 'disabled' : ''}>上移</button><button type="button" class="link-button" data-move="${i},1" ${i === a.sections.length - 1 ? 'disabled' : ''}>下移</button><button type="button" class="link-button danger" data-remove-section="${i}">删除板块</button></div><div class="card-grid"><label>板块标题<input data-path="sections.${i}.title" value="${e(section.title)}" required></label><label>大纲中的名称<input data-path="sections.${i}.nav" value="${e(section.nav || '')}" placeholder="留空则与标题相同"></label></div>${section.groups.some(g => g.kind === 'journal' || g.kind === 'conference') ? importBoxHTML(i) : ''}${section.groups.map((group, j) => groupHTML(group, i, j, p)).join('')}<button type="button" class="add-button" data-add-group="${i}">＋ 添加分组</button></fieldset>`;
   panel.innerHTML = `<p class="editor-note">保存后同步更新学术主页 <a href="${ACADEMIC_ORIGIN}" target="_blank" rel="noopener noreferrer">xiyangliu666.github.io ↗</a> 和这里的 academic 页面。写法：**粗体**　__下划线__　*斜体*　[文字](链接)。</p>
 <nav class="academic-jump" aria-label="学术经历大纲">${outline}</nav>
 <form class="editor-form academic-form" novalidate>
@@ -437,7 +483,11 @@ function setPath(target, path, value) {
   const keys = path.split('.');
   let node = target;
   for (const key of keys.slice(0, -1)) node = node[key];
-  node[keys.at(-1)] = keys.at(-1) === 'items' ? splitItems(value) : value;
+  const last = keys.at(-1);
+  if (last === 'authors') node[last] = value.split(/\s*,\s*(?:and\s+)?|\s+and\s+|\n+/).map(x => x.trim()).filter(Boolean);
+  else if (last === 'inventors') node[last] = value.split(/\s*[，,、]\s*|\n+/).map(x => x.trim()).filter(Boolean);
+  else if (last === 'kind' && node.kind !== value && STRUCTURED.includes(value)) {node.kind = value; node.items = []; node.gap = 18;}
+  else node[last] = value;
 }
 function collectAcademic() {
   const next = structuredClone(academicState);
@@ -449,6 +499,7 @@ function academicDirty() {
   return canon(collectAcademic()) !== canon(academicState);
 }
 function restructure(change) {
+  rememberOpen();
   academicState = collectAcademic();
   change(academicState);
   try {localStorage.setItem(ACADEMIC_DRAFT_KEY, canon(academicState));} catch {}
@@ -478,6 +529,45 @@ function bindAcademicEditor() {
   form.querySelectorAll('[data-remove-group]').forEach(button => button.addEventListener('click', async () => {
     const [i, j] = button.dataset.removeGroup.split(',').map(Number);
     if (await ask('删除这个分组和其中的内容？保存后才会生效。', '删除')) restructure(a => a.sections[i].groups.splice(j, 1));
+  }));
+  form.querySelectorAll('select[data-path$=".kind"]').forEach(select => select.addEventListener('change', () => restructure(() => {})));
+  form.querySelectorAll('[data-item-move]').forEach(button => button.addEventListener('click', () => {
+    const [i, j, k, d] = button.dataset.itemMove.split(',').map(Number);
+    restructure(a => {const items = a.sections[i].groups[j].items; const [x] = items.splice(k, 1); items.splice(k + d, 0, x);});
+  }));
+  form.querySelectorAll('[data-item-remove]').forEach(button => button.addEventListener('click', async () => {
+    const [i, j, k] = button.dataset.itemRemove.split(',').map(Number);
+    const item = academicState.sections[i].groups[j].items[k];
+    const name = typeof item === 'string' ? item.replace(/[*_\[\]]|\(http[^)]*\)/g, '').slice(0, 40) : item.title;
+    if (await ask(`删除“${name || '这一条'}”？保存后才会生效。`, '删除')) restructure(a => a.sections[i].groups[j].items.splice(k, 1));
+  }));
+  form.querySelectorAll('[data-add-item]').forEach(button => button.addEventListener('click', () => {
+    const [i, j] = button.dataset.addItem.split(',').map(Number);
+    let added = null;
+    restructure(a => {
+      const group = a.sections[i].groups[j];
+      if (group.kind === 'patent') {added = blankPatent(); group.items.unshift(added);}
+      else group.items.push('');
+    });
+    if (added) focusItem(added.id);
+    else panel.querySelectorAll(`#ae-s-${i} .academic-group`)[j]?.querySelector('.item-row:last-child textarea')?.focus();
+  }));
+  form.querySelectorAll('[data-manual]').forEach(button => button.addEventListener('click', () => {
+    const [i, kind] = button.dataset.manual.split(',');
+    const item = blankPaper();
+    restructure(a => paperGroup(a.sections[Number(i)], kind).items.push(item));
+    focusItem(item.id);
+    setStatus('已添加一篇空白论文，请填写后点保存并发布', 'warn');
+  }));
+  form.querySelectorAll('[data-import]').forEach(button => button.addEventListener('click', () => importPaper(Number(button.dataset.import))));
+  form.querySelectorAll('[data-import-input]').forEach(input => input.addEventListener('keydown', event => {if (event.key === 'Enter') {event.preventDefault(); importPaper(Number(input.dataset.importInput));}}));
+  form.querySelectorAll('details[data-item-id] .item-fields').forEach(fields => fields.addEventListener('change', () => {
+    const details = fields.closest('details');
+    const next = collectAcademic();
+    const [, i, , j, , k] = fields.querySelector('[data-path]').dataset.path.split('.');
+    const group = next.sections[i].groups[j];
+    const markup = displayItems({...group, items: group.kind === 'patent' ? group.items : sortedItems(group)}, next.profile)[group.kind === 'patent' ? Number(k) : sortedItems(group).indexOf(group.items[k])];
+    details.querySelector('.item-preview').innerHTML = renderInline(markup);
   }));
   form.querySelector('[data-add-section]').addEventListener('click', () => {
     restructure(a => a.sections.push({id: `new-${crypto.randomUUID()}`, title: '新的板块', nav: '', groups: [{heading: '', kind: 'list', items: [], gap: 8}]}));
@@ -516,12 +606,49 @@ function bindAcademicEditor() {
   });
   form.querySelector('[data-path="profile.photo"]').addEventListener('change', event => {event.target.closest('.image-field').querySelector('.image-thumb').innerHTML = academicThumb(event.target.value.trim());});
 }
+async function importPaper(i) {
+  const input = panel.querySelector(`[data-import-input="${i}"]`);
+  if (!input || academicLookupBusy) return;
+  const value = input.value.trim();
+  if (!value) {input.focus(); setStatus('请先粘贴论文链接', 'warn'); return;}
+  academicLookupBusy = true;
+  const button = panel.querySelector(`[data-import="${i}"]`);
+  button.disabled = true; button.textContent = '正在识别…';
+  setStatus('正在识别论文信息…');
+  try {
+    const {kind, item} = await lookupPaper(value);
+    const current = collectAcademic();
+    const all = current.sections.flatMap(s => s.groups).filter(g => g.kind === 'journal' || g.kind === 'conference').flatMap(g => g.items);
+    const norm = t => String(t || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const dup = all.find(x => (item.doi && x.doi && x.doi.toLowerCase() === item.doi.toLowerCase()) || (item.url && x.url === item.url) || norm(x.title) === norm(item.title));
+    if (dup && !await ask(`这篇论文好像已经有了：“${dup.title}”。还要再添加一次吗？`, '仍然添加')) {setStatus('已取消添加'); return;}
+    const entry = {id: `item-${crypto.randomUUID().slice(0, 10)}`, ...item};
+    restructure(a => paperGroup(a.sections[i], kind).items.push(entry));
+    focusItem(entry.id);
+    setStatus(`已识别为${kind === 'journal' ? '期刊' : '会议'}论文，请核对内容（尤其是简称和出版信息），然后点保存并发布`, 'ok');
+  } catch (error) {
+    setStatus(`${error.message}`, 'error');
+  } finally {
+    academicLookupBusy = false;
+    const again = panel.querySelector(`[data-import="${i}"]`);
+    if (again) {again.disabled = false; again.textContent = '自动识别';}
+  }
+}
 function finalizeAcademic(next) {
   for (const section of next.sections) {
     section.title = section.title.trim();
     if (!section.title) throw new Error('有板块没有填写标题');
     if (section.id.startsWith('new-')) section.id = uniqueId(section.title, next.sections);
     if (!section.nav || section.nav.trim() === section.title) section.nav = section.title;
+    for (const group of section.groups) {
+      if (!STRUCTURED.includes(group.kind)) {group.items = group.items.map(x => String(x).replace(/\s*\n\s*/g, ' ').trim()).filter(Boolean); continue;}
+      for (const item of group.items) {
+        for (const key of Object.keys(item)) if (typeof item[key] === 'string') item[key] = item[key].trim();
+        if (!item.title) throw new Error(`“${section.title}”中有条目没有填写题目`);
+        if (group.kind !== 'patent') {item.year = String(item.date || item.year || '').slice(0, 4) || item.year; item.date ||= item.year;}
+      }
+      if (group.kind !== 'patent') group.items = sortedItems(group);
+    }
     section.groups = section.groups.filter(group => group.items.length || group.heading.trim());
   }
   return validateAcademic(next);

@@ -34,7 +34,8 @@ test('图片路径支持仓库子目录，危险链接被拦截',()=>{
 test('导入的 HTML 只显示为文字',()=>{
   assert.equal(escapeHTML('<script>"x"</script>'),'&lt;script&gt;&quot;x&quot;&lt;/script&gt;');
 });
-import {validateAcademic, renderInline, renderHomepage, splitItems} from '../js/academic.js';
+import {validateAcademic, renderInline, renderHomepage, splitItems, displayItems} from '../js/academic.js';
+import {fromCrossref, findDoi} from '../js/paper-lookup.js';
 const academic = {profile:{name:'Xiyang Liu',nameZh:'刘喜洋',photo:'images/a.jpg',affiliation:'*Ph.D. Candidate*\n[Xidian](https://en.xidian.edu.cn/)\n\n*Visiting*',contact:'Email: [a@b.c](mailto:a@b.c)'},sections:[{id:'Publications',title:'Selected Publications',nav:'Publications',groups:[{heading:'Journal Papers',kind:'list',gap:18,items:['**[J-1]** **__X. Liu__**, “Title,” 2026. [[Paper](https://ieeexplore.ieee.org/document/1)]']}]}],footer:'© 2026'};
 test('学术经历标记只生成安全的格式与链接',()=>{
   assert.equal(renderInline('**b** __u__ *i*'),'<b>b</b> <u>u</u> <i>i</i>');
@@ -48,4 +49,23 @@ test('学术主页按原有 jemdoc 样式生成',()=>{
   assert.match(page,/<li style="margin-bottom: 18px;"><b>\[J-1\]<\/b> <b><u>X. Liu<\/u><\/b>/);
   assert.match(page,/Xidian<\/font><\/a><br \/><br \/>\n<i>Visiting<\/i>/);
   const dup=structuredClone(academic);dup.sections.push(dup.sections[0]);assert.throws(()=>validateAcademic(dup),/编号/);
+});
+test('论文按日期从新到旧编号，作者名自动加粗',()=>{
+  const profile={name:'Xiyang Liu',nameZh:'刘喜洋'};
+  const group={kind:'conference',items:[{id:'a',authors:['X. Liu','W. Bai','M. Sheng'],title:'Old',venue:'IEEE International Conference on Communications',abbr:'ICC',year:'2025',date:'2025-06-08',extra:'Montreal, Canada, Jun. 8–12, 2025',url:'https://x.y/1'},{id:'b',authors:['W. Bai','X. Liu'],title:'New',venue:'IEEE Global Communications Conference',abbr:'GLOBECOM',year:'2026',date:'2026-12',extra:'',url:''}]};
+  const out=displayItems(group,profile);
+  assert.equal(out[0],'**[C-2, GLOBECOM\'26]** W. Bai and **__X. Liu__**, “New,” **IEEE Global Communications Conference (GLOBECOM)**, 2026.');
+  assert.equal(out[1],'**[C-1, ICC\'25]** **__X. Liu__**, W. Bai, and M. Sheng, “Old,” **IEEE International Conference on Communications (ICC)**, Montreal, Canada, Jun. 8–12, 2025. [[Paper](https://x.y/1)]');
+  const patents=displayItems({kind:'patent',items:[{id:'p',title:'一种方法',inventors:['盛敏','刘喜洋'],numberLabel:'公开号',number:'CN1A'}]},profile);
+  assert.equal(patents[0],'一种方法，发明人：盛敏，**__刘喜洋__**，公开号：CN1A。');
+});
+test('从 Crossref 数据识别期刊与会议论文',()=>{
+  const journal=fromCrossref({type:'journal-article',DOI:'10.1109/TCOMM.2026.1234567',title:['Constellation-Level  Modeling'],'container-title':['IEEE Transactions on Communications'],author:[{given:'Xiyang',family:'Liu'},{given:'Wei-Gang',family:'Bai'}],'published-online':{'date-parts':[[2026,3,2]]},volume:'74',issue:'3',page:'100-115'},'https://ieeexplore.ieee.org/document/11673205');
+  assert.equal(journal.kind,'journal');
+  assert.deepEqual(journal.item.authors,['X. Liu','W.-G. Bai']);
+  assert.equal(journal.item.abbr,'TCOM'); assert.equal(journal.item.date,'2026-03-02'); assert.equal(journal.item.extra,'vol. 74, no. 3, pp. 100–115, 2026');
+  const conf=fromCrossref({type:'proceedings-article',DOI:'10.1109/ICC52391.2025.11161010',title:['Impact Analysis'],'container-title':['ICC 2025 - IEEE International Conference on Communications'],author:[{given:'Xiyang',family:'Liu'}],event:{name:'ICC 2025 - IEEE International Conference on Communications',location:'Montreal, QC, Canada',start:{'date-parts':[[2025,6,8]]},end:{'date-parts':[[2025,6,12]]}},issued:{'date-parts':[[2025,6,8]]}});
+  assert.equal(conf.kind,'conference'); assert.equal(conf.item.abbr,'ICC'); assert.equal(conf.item.venue,'IEEE International Conference on Communications');
+  assert.equal(conf.item.extra,'Montreal, Canada, Jun. 8–12, 2025'); assert.equal(conf.item.url,'https://doi.org/10.1109/ICC52391.2025.11161010');
+  assert.equal(findDoi('https://doi.org/10.1109/TCOMM.2026.1234567'),'10.1109/TCOMM.2026.1234567');
 });
