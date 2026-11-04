@@ -61,11 +61,45 @@ function watchOutline() {
   },{rootMargin:'-80px 0px -65% 0px'});
   main.querySelectorAll('.academic-section').forEach(section=>outlineObserver.observe(section));
 }
+function openViewer(href, title) {
+  let viewer = document.querySelector('#link-viewer');
+  if(!viewer) {
+    viewer = document.createElement('aside');
+    viewer.id = 'link-viewer';
+    viewer.className = 'reference-panel link-viewer';
+    viewer.innerHTML = '<header class="panel-heading"><h2></h2><a class="viewer-open" target="_blank" rel="noopener noreferrer">新窗口打开 ↗</a><button type="button" class="panel-close viewer-close" aria-label="关闭">×</button></header><p class="viewer-note">如果下面一直是空白或显示拒绝连接，说明这个网站不允许嵌入，请点右上角在新窗口打开。</p><div class="viewer-frame"><span class="viewer-loading">正在打开……</span><iframe title="链接内容" referrerpolicy="no-referrer-when-downgrade"></iframe></div>';
+    document.body.append(viewer);
+    viewer.querySelector('.viewer-close').addEventListener('click', closeViewer);
+    viewer.querySelector('iframe').addEventListener('load', () => viewer.classList.add('is-loaded'));
+  }
+  viewer.querySelector('h2').textContent = title;
+  viewer.querySelector('.viewer-open').href = href;
+  viewer.classList.remove('is-loaded');
+  viewer.querySelector('iframe').src = href;
+  viewer.hidden = false;
+  document.body.classList.add('has-viewer');
+}
+function closeViewer() {
+  const viewer = document.querySelector('#link-viewer');
+  if(!viewer) return;
+  viewer.hidden = true;
+  viewer.querySelector('iframe').src = 'about:blank';
+  document.body.classList.remove('has-viewer');
+}
+document.addEventListener('keydown', event => {if(event.key === 'Escape') closeViewer();});
 function bindAcademic() {
   main.querySelectorAll('[data-jump]').forEach(button=>button.addEventListener('click',()=>document.getElementById(button.dataset.jump)?.scrollIntoView({behavior:'smooth',block:'start'})));
   watchOutline();
+  main.querySelectorAll('.academic-section a[href^="http"]').forEach(link=>link.addEventListener('click',event=>{
+    if(event.metaKey || event.ctrlKey || event.shiftKey) return;
+    event.preventDefault();
+    const item = link.closest('li, p');
+    const title = link.textContent.trim().toLowerCase() === 'paper' && item ? item.textContent.match(/“([^”]+)”/)?.[1] || link.textContent : link.textContent;
+    openViewer(link.href, title.replace(/,$/, ''));
+  }));
 }
 function render() {
+  closeViewer();
   const [requested='home',routeId] = location.hash.slice(1).split('/');
   const page = requested === 'home' || titles[requested] ? requested : 'home';
   document.body.classList.toggle('is-home',page==='home');
