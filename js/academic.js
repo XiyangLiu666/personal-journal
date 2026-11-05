@@ -138,7 +138,7 @@ ${p.photo ? `<img src="./${esc(p.photo.replace(/^\.\//, ''))}" alt="${esc(p.name
 <td align="left">
 <p><font size="6">${esc(p.name)}${p.nameZh ? ` (</font><font size="6" style="font-family:Microsoft YaHei">${esc(p.nameZh)}</font><font size="5">) ` : ''}</font></p>
 <p style="font-size: 20px;">${affiliation}</p>
-<p style="font-size: 20px;">${inline(p.contact)}
+<p style="font-size: 20px;">${String(p.contact || '').split('\n').map(line => inline(line.trim())).join('<br />\n')}
 </p>
 
 <p style="font-size: 14px;">
