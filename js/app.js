@@ -61,41 +61,69 @@ function watchOutline() {
   },{rootMargin:'-80px 0px -65% 0px'});
   main.querySelectorAll('.academic-section').forEach(section=>outlineObserver.observe(section));
 }
-function openViewer(href, title) {
+// 外部网站大多禁止被嵌入网页，所以在右侧位置打开一个同样大小的独立小窗口，右侧栏显示这一条的信息。
+let viewerWindow = null;
+function viewerPanel() {
   let viewer = document.querySelector('#link-viewer');
-  if(!viewer) {
-    viewer = document.createElement('aside');
-    viewer.id = 'link-viewer';
-    viewer.className = 'reference-panel link-viewer';
-    viewer.innerHTML = '<header class="panel-heading"><h2></h2><a class="viewer-open" target="_blank" rel="noopener noreferrer">新窗口打开 ↗</a><button type="button" class="panel-close viewer-close" aria-label="关闭">×</button></header><p class="viewer-note">如果下面一直是空白或显示拒绝连接，说明这个网站不允许嵌入，请点右上角在新窗口打开。</p><div class="viewer-frame"><span class="viewer-loading">正在打开……</span><iframe title="链接内容" referrerpolicy="no-referrer-when-downgrade"></iframe></div>';
-    document.body.append(viewer);
-    viewer.querySelector('.viewer-close').addEventListener('click', closeViewer);
-    viewer.querySelector('iframe').addEventListener('load', () => viewer.classList.add('is-loaded'));
-  }
+  if(viewer) return viewer;
+  viewer = document.createElement('aside');
+  viewer.id = 'link-viewer';
+  viewer.className = 'reference-panel link-viewer';
+  viewer.hidden = true;
+  viewer.innerHTML = '<header class="panel-heading"><h2></h2><button type="button" class="panel-close viewer-close" aria-label="关闭">×</button></header><div class="viewer-body"><p class="viewer-state"></p><div class="viewer-item"></div><p class="viewer-url"></p><div class="viewer-actions"><button type="button" class="viewer-reopen">在右侧窗口打开 ↗</button><a class="viewer-tab" target="_blank" rel="noopener noreferrer">在新标签页打开 ↗</a></div><p class="viewer-note">这些网站不允许被嵌入别的网页，所以会在这个位置打开一个独立的小窗口。如果没有出现，请允许本网站弹出窗口，或点“在新标签页打开”。</p></div>';
+  document.body.append(viewer);
+  viewer.querySelector('.viewer-close').addEventListener('click', closeViewer);
+  viewer.querySelector('.viewer-reopen').addEventListener('click', () => popupAt(viewer.dataset.href, viewer));
+  viewer.querySelector('.viewer-item').addEventListener('click', event => {const a = event.target.closest('a[href^="http"]'); if(a && !event.metaKey && !event.ctrlKey) {event.preventDefault(); viewer.dataset.href = a.href; viewer.querySelector('.viewer-url').textContent = a.href; viewer.querySelector('.viewer-tab').href = a.href; popupAt(a.href, viewer);}});
+  return viewer;
+}
+function popupAt(href, viewer) {
+  const rect = viewer.getBoundingClientRect();
+  const chromeX = Math.max(0, (window.outerWidth - window.innerWidth) / 2);
+  const chromeY = Math.max(0, window.outerHeight - window.innerHeight - chromeX);
+  const left = Math.round(window.screenX + chromeX + rect.left);
+  const top = Math.round(window.screenY + chromeY + rect.top);
+  const width = Math.round(rect.width), height = Math.round(rect.height);
+  const features = `popup=yes,left=${left},top=${top},width=${width},height=${height}`;
+  try {
+    if(viewerWindow && !viewerWindow.closed) {
+      viewerWindow.location.href = href;
+      try {viewerWindow.moveTo(left, top); viewerWindow.resizeTo(width, height);} catch {}
+    } else viewerWindow = window.open(href, 'journal-link-viewer', features);
+  } catch {viewerWindow = window.open(href, 'journal-link-viewer', features);}
+  const state = viewer.querySelector('.viewer-state');
+  if(viewerWindow) {try {viewerWindow.focus();} catch {} state.textContent = '已在右侧窗口打开。';}
+  else state.textContent = '浏览器拦截了弹出窗口。请在地址栏右侧允许本网站弹出窗口，或点下面的“在新标签页打开”。';
+}
+function openViewer(href, title, itemHTML) {
+  if(window.matchMedia('(max-width: 700px)').matches) {window.open(href, '_blank', 'noopener'); return;}
+  const viewer = viewerPanel();
+  viewer.dataset.href = href;
   viewer.querySelector('h2').textContent = title;
-  viewer.querySelector('.viewer-open').href = href;
-  viewer.classList.remove('is-loaded');
-  viewer.querySelector('iframe').src = href;
+  viewer.querySelector('.viewer-item').innerHTML = itemHTML || '';
+  viewer.querySelector('.viewer-url').textContent = href;
+  viewer.querySelector('.viewer-tab').href = href;
   viewer.hidden = false;
   document.body.classList.add('has-viewer');
+  popupAt(href, viewer);
 }
 function closeViewer() {
   const viewer = document.querySelector('#link-viewer');
-  if(!viewer) return;
-  viewer.hidden = true;
-  viewer.querySelector('iframe').src = 'about:blank';
+  if(viewer) viewer.hidden = true;
   document.body.classList.remove('has-viewer');
+  try {if(viewerWindow && !viewerWindow.closed) viewerWindow.close();} catch {}
+  viewerWindow = null;
 }
 document.addEventListener('keydown', event => {if(event.key === 'Escape') closeViewer();});
 function bindAcademic() {
   main.querySelectorAll('[data-jump]').forEach(button=>button.addEventListener('click',()=>document.getElementById(button.dataset.jump)?.scrollIntoView({behavior:'smooth',block:'start'})));
   watchOutline();
-  main.querySelectorAll('.academic-section a[href^="http"]').forEach(link=>link.addEventListener('click',event=>{
+  main.querySelectorAll('.academic-panel .panel-content a[href^="http"]').forEach(link=>link.addEventListener('click',event=>{
     if(event.metaKey || event.ctrlKey || event.shiftKey) return;
     event.preventDefault();
-    const item = link.closest('li, p');
+    const item = link.closest('li, .academic-section p');
     const title = link.textContent.trim().toLowerCase() === 'paper' && item ? item.textContent.match(/“([^”]+)”/)?.[1] || link.textContent : link.textContent;
-    openViewer(link.href, title.replace(/,$/, ''));
+    openViewer(link.href, title.replace(/,$/, ''), item && item.tagName === 'LI' ? item.innerHTML : '');
   }));
 }
 function render() {
